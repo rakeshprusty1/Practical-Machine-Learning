@@ -1,0 +1,103 @@
+---
+title: "Practical Machine Learning Project"
+author: "Rakesh Prusty"
+date: "November 22, 2016"
+output: html_document
+---
+
+# Background
+
+One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, data used from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. Goal of the project is to predict the manner in which they did the exercise. This is the "classe" variable which we need to predict.  
+
+# Processing
+
+## Load Libraries 
+
+We will load all the required packages.
+
+```{r, echo=TRUE}
+library(caret); library(rattle); library(rpart); library(rpart.plot);
+library(randomForest)
+```
+
+## Import data
+
+The data was downloaded from the links and saved in the working folder and then data was read to training and testing datasets respectively.
+
+```{r, echo=TRUE}
+training <- read.csv("pml-training.csv",na.strings = c("NA", ""))
+testing <- read.csv("pml-testing.csv",na.strings = c("NA", ""))
+dim(training)
+dim(testing)
+```
+The training dataset has 19622 records and 160 variables. Testing dataset has 20 records with same variables as training. We will predict the "classe" variable in training set.
+
+## Cleansing Data
+
+Now, we will try to remove the columns with all missing ("NA") values.
+
+```{r, echo=TRUE}
+sh_training <- training[,colSums(is.na(training))==0]
+sh_testing <- testing[,colSums(is.na(testing))==0]
+```
+
+The first seven variables of both training and testing data are not useful for prediction. Let's remove the variables from processing. 
+
+```{r, echo=TRUE}
+trainData <- sh_training[,-c(1:7)]
+testData <- sh_testing[,-c(1:7)]
+```
+The final data has 53 variables.
+
+## Data Splitting
+
+The training data is now subdivided into a sub training and validation set.We will use 70% data for the sub training and rest for the sub testing set.
+
+```{r, echo=TRUE}
+set.seed(4321)
+inTrain <- createDataPartition(trainData$classe,p=0.7,list = FALSE)
+subtrain <- trainData[inTrain,]
+subtest <- trainData[-inTrain,]
+```
+
+## Model Building and Prediction
+
+We will use classification trees and random forests to predict.
+
+### Classification Trees
+
+We will use 5 fold cross validation while rpart model fitting. 
+
+```{r, echo=TRUE}
+rpart_mod <- train(classe~.,data=subtrain,method="rpart",trControl=trainControl(method = "cv",number = 5))
+#Plot the classification tree
+fancyRpartPlot(rpart_mod$finalModel)
+#Predict outcome using subtest dataset
+rpart_pred <- predict(rpart_mod,subtest)
+rpart_accuracy <- confusionMatrix(subtest$classe,rpart_pred)$overall[1]
+rpart_outofsample_error <- 1-rpart_accuracy
+``` 
+
+The accuracy of the prediction is `r rpart_accuracy` and the out of sample error is `r rpart_outofsample_error`. It's clear that classification does not predict the "classe" variable well.
+
+### Random Forests
+
+Now we will try Random Forests model for prediction using 5 fold cross validation.
+
+```{r, echo=TRUE}
+rf_mod <- train(classe~.,data=subtrain,method="rf",trControl=trainControl(method = "cv",number = 5))
+#Predict outcome using subtest dataset
+rf_pred <- predict(rf_mod,subtest)
+rf_accuracy <- confusionMatrix(subtest$classe,rf_pred)$overall[1]
+rf_outofsample_error <- 1-rf_accuracy
+``` 
+
+The accuracy of the prediction is `r rf_accuracy` and the out of sample error is
+`r rf_outofsample_error`. Because of this high accuracy rate we will use Random Forest model on the final test data set.
+
+# Prediction on Test Set 
+```{r, echo=TRUE}
+#Predict outcome using test dataset
+rf_pred <- predict(rf_mod,testData)
+rf_pred
+``` 
